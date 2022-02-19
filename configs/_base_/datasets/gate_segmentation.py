@@ -7,7 +7,7 @@ crop_size = (256, 256)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
-    dict(type='ReplaceBackground', back_path=''),  # fill in back_path during training
+    dict(type='ReplaceBackground', back_path='data/background/train'),
     dict(type='Resize', img_scale=(320, 240), ratio_range=(0.5, 2.0)),
     dict(type='RandomCrop', crop_size=crop_size, cat_max_ratio=0.75),
     dict(type='RandomFlip', flip_ratio=0.5),
@@ -20,7 +20,7 @@ train_pipeline = [
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
-    dict(type='ReplaceBackground', back_path=''),  # fill in back_path during training
+    dict(type='ReplaceBackground', back_path='data/background/val'),
     dict(
         type='MultiScaleFlipAug',
         img_scale=(320, 240),
