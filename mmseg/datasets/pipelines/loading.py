@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os
 import os.path as osp
 
 import mmcv
@@ -150,5 +151,77 @@ class LoadAnnotations(object):
     def __repr__(self):
         repr_str = self.__class__.__name__
         repr_str += f'(reduce_zero_label={self.reduce_zero_label},'
+        repr_str += f"imdecode_backend='{self.imdecode_backend}')"
+        return repr_str
+
+
+@PIPELINES.register_module()
+class ReplaceBackground(object):
+    def __init__(self,
+                 back_path: list,
+                 img_extensions=["jpg", "png", "jpeg"],
+                 to_float32=False,
+                 color_type='color',
+                 file_client_args=dict(backend='disk'),
+                 imdecode_backend='cv2'):
+        if isinstance(back_path, str):
+            back_path = [back_path]
+        if isinstance(img_extensions, str):
+            img_extensions = [img_extensions]
+
+        self.back_info = self._load_back_info(back_path=back_path, img_extensions=img_extensions)
+
+        self.back_path = back_path
+        self.img_extensions = img_extensions
+
+        self.to_float32 = to_float32
+        self.color_type = color_type
+        self.file_client_args = file_client_args.copy()
+        self.file_client = None
+        self.imdecode_backend = imdecode_backend
+
+    @staticmethod
+    def _load_back_info(back_path: list, img_extensions: list):
+        back_info = []
+        for back_dir in back_path:
+            for f_name in os.listdir(back_dir):
+                f_path = osp.join(back_dir, f_name)
+                if osp.isfile(f_path) and f_name.split('.')[-1] in img_extensions:
+                    back_info.append(f_path)
+
+        return back_info
+
+    def __call__(self, results):
+        if results.get('img', None) is None:
+            raise KeyError("Cannot find 'img'. Please LoadImageFromFile first.")
+        if results.get('gt_semantic_seg', None) is None:
+            raise KeyError("Cannot find 'gt_semantic_seg'. Please LoadAnnotations first.")
+
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+
+        # get mask for background
+        mask_back = (results['gt_semantic_seg'] == 1)  # 0 -> gate, 1 -> background
+
+        # choose a background img and load
+        idx = np.random.randint(len(self.back_info))
+        filename = self.back_info[idx]
+        img_bytes = self.file_client.get(filename)
+        img = mmcv.imfrombytes(
+            img_bytes, flag=self.color_type, backend=self.imdecode_backend)
+        if self.to_float32:
+            img = img.astype(np.float32)
+        img = mmcv.imresize(img, results['img_shape'][0: 2][::-1])  # resize to img shape
+        results['img'][mask_back] = img[mask_back]  # replace background
+
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += '(back_path=['
+        repr_str += ','.join(self.back_path)
+        repr_str += '],'
+        repr_str += f'to_float32={self.to_float32},'
+        repr_str += f"color_type='{self.color_type}',"
         repr_str += f"imdecode_backend='{self.imdecode_backend}')"
         return repr_str
