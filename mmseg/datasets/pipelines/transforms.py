@@ -5,6 +5,7 @@ import mmcv
 import numpy as np
 from mmcv.utils import deprecated_api_warning, is_tuple_of
 from numpy import random
+import cv2
 
 from ..builder import PIPELINES
 
@@ -1308,4 +1309,55 @@ class RandomMosaic(object):
         repr_str += f'center_ratio_range={self.center_ratio_range}, '
         repr_str += f'pad_val={self.pad_val}, '
         repr_str += f'seg_pad_val={self.pad_val})'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class RandomBrightness(object):
+    def __init__(self, value_lim=(-50, 50)):
+        if isinstance(value_lim, int):
+            value_lim = (-abs(value_lim), abs(value_lim))
+        self.value_lim = value_lim
+
+    def __call__(self, results):
+        if results.get('img', None) is None:
+            raise KeyError("Cannot find 'img'. Please LoadImageFromFile first.")
+        if results.get('gt_semantic_seg', None) is None:
+            raise KeyError("Cannot find 'gt_semantic_seg'. Please LoadAnnotations first.")
+
+        # get mask
+        mask_fore, mask_back = (results['gt_semantic_seg'] == 0), (results['gt_semantic_seg'] == 1)
+
+        # change brightness
+        img1 = self._change_brightness(results['img'])  # for foreground
+        img2 = self._change_brightness(results['img'])  # for background
+
+        results['img'][mask_fore] = img1[mask_fore]
+        results['img'][mask_back] = img2[mask_back]
+
+        return results
+
+    def _change_brightness(self, img: np.ndarray):
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+
+        value = np.random.randint(*self.value_lim)
+        value = np.clip(value, -255, 255)
+        abs_value = np.abs(value).astype(np.uint8)
+
+        if value > 0:  # increase brightness
+            ulim = 255 - value
+            v[v > ulim] = 255
+            v[v <= ulim] += value
+        else:  # v <= 0, decrease brightness
+            llim = abs_value
+            v[v < llim] = 0
+            v[v >= llim] -= abs_value
+
+        final_hsv = cv2.merge((h, s, v))
+        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR)
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(value_lim={self.value_lim})'
         return repr_str
