@@ -121,6 +121,13 @@ def isaid_classes():
     ]
 
 
+def gateseg_classes():
+    """GateSegmentation class names for external use."""
+    return [
+        'gate', 'background'
+    ]
+
+
 def cityscapes_palette():
     """Cityscapes palette for external use."""
     return [[128, 64, 128], [244, 35, 232], [70, 70, 70], [102, 102, 156],
@@ -255,6 +262,11 @@ def isaid_palette():
             [0, 127, 255], [0, 100, 155]]
 
 
+def gateseg_palette():
+    """GateSegmentation palette for external use"""
+    return [[0, 255, 0], [0, 0, 0]]
+
+
 dataset_aliases = {
     'cityscapes': ['cityscapes'],
     'ade': ['ade', 'ade20k'],
@@ -267,7 +279,8 @@ dataset_aliases = {
         'coco-stuff10k', 'coco-stuff164k', 'coco_stuff', 'coco_stuff10k',
         'coco_stuff164k'
     ],
-    'isaid': ['isaid', 'iSAID']
+    'isaid': ['isaid', 'iSAID'],
+    'gateseg': ['gateseg']
 }
 
 
